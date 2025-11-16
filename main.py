@@ -1,9 +1,9 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
-
+from langchain.agents import create_agent
+from tools import opentripmap_search_tool
 
 load_dotenv()
 
@@ -14,31 +14,29 @@ class TravelPlanner(BaseModel):
     visiting_places: list[str]
     comments: str
 
-llm1 = ChatOpenAI(model='gpt-5')
+llm1 = ChatOpenAI(model="gpt-5", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system", 
-            """
-            You are a travel planning assistant. You have 10 years of experience planning the best trips for any tourist. You can plan trips anywhere in the world.
-            Your goal is to help tourists find the best places to visit based on their preferences, constraints and time of year.
-            If any information is missing, make valid assumptions and let the user know about your assumptions.
-            Wrap the output in this format and provide no other text:{format_instructions}
-            """
-        ),
-        ("placeholder", "{chat_history}"),
-        ("human", "{query}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ]
-).partial(format_instructions=parser.get_format_instructions())
+tools = [opentripmap_search_tool]
 
-agent_chain = prompt | llm1 | parser
+system_prompt = f"""
+You are a travel planning assistant. You have 10 years of experience planning the best trips for any tourist. You can plan trips anywhere in the world.
+Your goal is to help tourists find the best places to visit based on their preferences, constraints and time of year.
+You MAY call tools like `opentripmap_search_tool` to look up attractions and POIs.
+If any information is missing, make valid assumptions and let the user know about your assumptions.
+Return ONLY the following JSON object, no extra commentary, and no backticks:
+{parser.get_format_instructions()}
+"""
 
-chat_history = ""
+agent = create_agent(
+    model=llm1,
+    tools=tools,
+    system_prompt=system_prompt,
+)
 
-print("Travel planner ready. Type your question, or 'exit' to quit.\n")
+chat_history = ""  # kept just so your structure is similar, though not used here
+
+print("Travel planner (create_agent) ready. Type your question, or 'exit' to quit.\n")
 
 while True:
     user_query = input(">>> ").strip()
@@ -47,17 +45,30 @@ while True:
         break
 
     try:
-        raw_response = agent_chain.invoke(
+        # create_agent expects "messages" as input
+        msg = agent.invoke(
             {
-                "query": user_query,
-                "chat_history": chat_history,
-                "agent_scratchpad": "",
+                "messages": [
+                    {"role": "user", "content": user_query}
+                ]
             }
         )
+
+        # msg can be a dict with "messages" or a single message; handle both
+        if isinstance(msg, dict) and "messages" in msg:
+            content = msg["messages"][-1].content
+        else:
+            content = msg.content
+
+        raw_response = parser.parse(content)
 
         print(raw_response)
         print(type(raw_response))
         print(raw_response.visiting_places)
 
     except Exception as e:
-        print(f"Error parsing response: {e}, raw response: {raw_response}")
+        print(f"Error parsing response: {e}")
+        try:
+            print("Raw message content:", content)
+        except NameError:
+            print("No content extracted yet.")

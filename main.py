@@ -5,6 +5,8 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_agent
 from tools import opentripmap_search_tool
 
+from langchain_core.callbacks import BaseCallbackHandler
+
 load_dotenv()
 
 class TravelPlanner(BaseModel):
@@ -13,6 +15,17 @@ class TravelPlanner(BaseModel):
     budget_usd: float
     visiting_places: list[str]
     comments: str
+
+class ToolLoggingHandler(BaseCallbackHandler):
+    def on_tool_start(self, serialized, input_str, **kwargs):
+        name = serialized.get("name", "unknown_tool")
+        print(f"\n[TOOL START] {name} | args={input_str}")
+
+    def on_tool_end(self, output, **kwargs):
+        out = str(output)
+        if len(out) > 300:
+            out = out[:300] + " ...[truncated]"
+        print(f"[TOOL END] output={out}\n")
 
 llm1 = ChatOpenAI(model="gpt-5", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
@@ -46,12 +59,14 @@ while True:
 
     try:
         # create_agent expects "messages" as input
+        handler = ToolLoggingHandler()
         msg = agent.invoke(
             {
                 "messages": [
                     {"role": "user", "content": user_query}
                 ]
-            }
+            },
+            config={"callbacks": [handler], "run_name": "TravelPlannerAgent"}
         )
 
         # msg can be a dict with "messages" or a single message; handle both

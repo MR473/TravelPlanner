@@ -7,6 +7,7 @@ import requests
 from pydantic import BaseModel, Field
 from langchain.tools import tool
 from dotenv import load_dotenv
+from mapping import get_mapping
 
 load_dotenv()
 
@@ -22,12 +23,7 @@ if not GEOAPIFY_API_KEY:
 # -------------------------------------------------------------------
 # Interest → Geoapify Places categories
 # -------------------------------------------------------------------
-CATEGORY_MAP: Dict[str, str] = {
-    "park": "leisure.park",
-    "landmark": "tourism.sights,heritage",
-    "restaurant": "catering.restaurant",
-    "entertainment": "entertainment",
-}
+CATEGORY_MAP: Dict[str, str] = get_mapping()
 
 # -------------------------------------------------------------------
 # Pydantic input models
@@ -145,7 +141,7 @@ def _geoapify_get(
     """
     Generic GET request helper.
 
-    Example paths:
+    paths:
       - /v1/geocode/search
       - /v2/places
       - /v1/routing

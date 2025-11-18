@@ -1,9 +1,11 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain.agents import create_agent
+from tools import geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines
 
+from langchain_core.callbacks import BaseCallbackHandler
 
 load_dotenv()
 
@@ -14,31 +16,68 @@ class TravelPlanner(BaseModel):
     visiting_places: list[str]
     comments: str
 
-llm1 = ChatOpenAI(model='gpt-5')
+class ToolLoggingHandler(BaseCallbackHandler):
+    def on_tool_start(self, serialized, input_str, **kwargs):
+        name = serialized.get("name", "unknown_tool")
+        print(f"\n[TOOL START] {name} | args={input_str}")
+
+    def on_tool_end(self, output, **kwargs):
+        out = str(output)
+        if len(out) > 300:
+            out = out[:300] + " ...[truncated]"
+        print(f"[TOOL END] output={out}\n")
+
+llm1 = ChatOpenAI(model="gpt-5", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system", 
-            """
-            You are a travel planning assistant. You have 10 years of experience planning the best trips for any tourist. You can plan trips anywhere in the world.
-            Your goal is to help tourists find the best places to visit based on their preferences, constraints and time of year.
-            If any information is missing, make valid assumptions and let the user know about your assumptions.
-            Wrap the output in this format and provide no other text:{format_instructions}
-            """
-        ),
-        ("placeholder", "{chat_history}"),
-        ("human", "{query}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ]
-).partial(format_instructions=parser.get_format_instructions())
+tools = [geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines]
 
-agent_chain = prompt | llm1 | parser
+system_prompt = f"""
+You are a highly reliable Travel Planning AI assistant. Your job is to create the best possible trip plans for users.
 
-chat_history = ""
+## TOOL USAGE RULES (VERY IMPORTANT)
+You MUST call a tool **whenever**:
+- You need information about places, attractions, landmarks, or POIs → use `geoapify_places_search`.
+- You need coordinates, locations, or address lookup → use `geoapify_geocode`.
+- You need travel time or routes between two locations → use `geoapify_route`.
+- You need reachability or isochrone/isodistance analysis → use `geoapify_isolines`.
 
-print("Travel planner ready. Type your question, or 'exit' to quit.\n")
+NEVER guess or hallucinate external geographic information.
+If ANY part of the itinerary depends on real-world place data, ALWAYS call the appropriate tool.
+
+If a tool returns incomplete, missing, or unusable data, you may fill the gap using reasonable assumptions,
+but you must clearly label such text with the correct tag:
+- [/START ASSUMPTION] ... [/END ASSUMPTION]
+
+##  OUTPUT TAGGING RULES
+EVERY section of your output MUST be wrapped in tags:
+- [/START AI] ... [/END AI] for AI-generated text that does not rely on tool data.
+- [/START TOOL] ... [/END TOOL] for text that directly uses tool-returned information.
+- [/START ASSUMPTION] ... [/END ASSUMPTION] for your assumptions.
+
+These tags MUST appear throughout your final answer.
+
+##  OUTPUT FORMAT
+Return a clear, concise, high-quality trip itinerary. 
+Blend TOOL-based content, AI planning, and ASSUMPTIONS where needed.
+
+IMPORTANT:
+Return ONLY the JSON specified below — the itinerary should appear in the "comments" field.
+DO NOT add commentary outside the JSON. DO NOT use backticks.
+
+{parser.get_format_instructions()}
+"""
+
+
+agent = create_agent(
+    model=llm1,
+    tools=tools,
+    system_prompt=system_prompt,
+)
+
+chat_history = ""  
+
+print("Travel planner (create_agent) ready. Type your question, or 'exit' to quit.\n")
 
 while True:
     user_query = input(">>> ").strip()
@@ -47,17 +86,32 @@ while True:
         break
 
     try:
-        raw_response = agent_chain.invoke(
+        # create_agent expects "messages" as input
+        handler = ToolLoggingHandler()
+        msg = agent.invoke(
             {
-                "query": user_query,
-                "chat_history": chat_history,
-                "agent_scratchpad": "",
-            }
+                "messages": [
+                    {"role": "user", "content": user_query}
+                ]
+            },
+            config={"callbacks": [handler], "run_name": "TravelPlannerAgent"}
         )
+
+        # msg can be a dict with "messages" or a single message; handle both
+        if isinstance(msg, dict) and "messages" in msg:
+            content = msg["messages"][-1].content
+        else:
+            content = msg.content
+
+        raw_response = parser.parse(content)
 
         print(raw_response)
         print(type(raw_response))
         print(raw_response.visiting_places)
 
     except Exception as e:
-        print(f"Error parsing response: {e}, raw response: {raw_response}")
+        print(f"Error parsing response: {e}")
+        try:
+            print("Raw message content:", content)
+        except NameError:
+            print("No content extracted yet.")

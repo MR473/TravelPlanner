@@ -9,12 +9,14 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 load_dotenv()
 
+
 class TravelPlanner(BaseModel):
     destination: str
     duration_days: int
     budget_usd: float
     visiting_places: list[str]
     comments: str
+
 
 class ToolLoggingHandler(BaseCallbackHandler):
     def on_tool_start(self, serialized, input_str, **kwargs):
@@ -26,6 +28,7 @@ class ToolLoggingHandler(BaseCallbackHandler):
         if len(out) > 300:
             out = out[:300] + " ...[truncated]"
         print(f"[TOOL END] output={out}\n")
+
 
 llm1 = ChatOpenAI(model="gpt-5", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
@@ -68,14 +71,14 @@ DO NOT add commentary outside the JSON. DO NOT use backticks.
 {parser.get_format_instructions()}
 """
 
-
 agent = create_agent(
     model=llm1,
     tools=tools,
     system_prompt=system_prompt,
 )
 
-chat_history = ""  
+# ---- NEW: in-memory chat history (list of message dicts) ----
+chat_history: list[dict] = []  # each item: {"role": "user" | "assistant", "content": str}
 
 print("Travel planner (create_agent) ready. Type your question, or 'exit' to quit.\n")
 
@@ -85,14 +88,17 @@ while True:
         print("Goodbye!")
         break
 
+    # Build messages = previous history + current user message
+    messages = chat_history + [
+        {"role": "user", "content": user_query}
+    ]
+
     try:
         # create_agent expects "messages" as input
         handler = ToolLoggingHandler()
         msg = agent.invoke(
             {
-                "messages": [
-                    {"role": "user", "content": user_query}
-                ]
+                "messages": messages
             },
             config={"callbacks": [handler], "run_name": "TravelPlannerAgent"}
         )
@@ -102,6 +108,10 @@ while True:
             content = msg["messages"][-1].content
         else:
             content = msg.content
+
+        # ---- NEW: update chat history with this turn ----
+        chat_history.append({"role": "user", "content": user_query})
+        chat_history.append({"role": "assistant", "content": content})
 
         raw_response = parser.parse(content)
 

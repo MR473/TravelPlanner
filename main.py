@@ -57,15 +57,16 @@ EVERY section of your output MUST be wrapped in tags:
 
 These tags MUST appear throughout your final answer.
 
-##  OUTPUT FORMAT
-Return a clear, concise, high-quality trip itinerary. 
-Blend TOOL-based content, AI planning, and ASSUMPTIONS where needed.
+##  OUTPUT FORMAT (HUMAN-READABLE, NO JSON)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Return ONLY the final trip plan in a clean, human-readable format.
 
-IMPORTANT:
-Return ONLY the JSON specified below — the itinerary should appear in the "comments" field.
-DO NOT add commentary outside the JSON. DO NOT use backticks.
-
-{parser.get_format_instructions()}
+- Structure the itinerary by **day** (e.g., "Day 1", "Day 2", etc.).
+- Under each day, use **bullet points** to list what happens (morning/afternoon/evening activities, food, transport, etc.).
+- You MUST still follow all tagging rules above, wrapping each relevant section in [/START AI], [/START TOOL], or [/START ASSUMPTION] tags.
+- DO NOT wrap your response in JSON. DO NOT add any extra commentary outside these tagged sections.
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Use the json format to get data on what to visit and oher travel details: {parser.get_format_instructions()}
 """
 
 
@@ -105,9 +106,10 @@ while True:
 
         raw_response = parser.parse(content)
 
-        print(raw_response)
-        print(type(raw_response))
+        #print(raw_response)
+        #print(type(raw_response))
         print(raw_response.visiting_places)
+        print(raw_response)
 
     except Exception as e:
         print(f"Error parsing response: {e}")

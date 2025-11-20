@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_agent
 from tools import geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines
@@ -33,10 +33,12 @@ class ToolLoggingHandler(BaseCallbackHandler):
         print(f"[TOOL END] output={out}\n")
 
 
-llm1 = ChatOpenAI(model="gpt-5", temperature=0)
+llm1 = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
 
 tools = [geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines]
+
+llm_with_tools = llm1.bind_tools(tools)
 
 system_prompt = f"""
 You are a highly reliable Travel Planning AI assistant. Your job is to create the best possible trip plans for users.
@@ -85,7 +87,7 @@ If you reverse the order, the response will be rejected and you must correct it.
 """
 
 agent = create_agent(
-    model=llm1,
+    model=llm_with_tools,
     tools=tools,
     system_prompt=system_prompt,
 )
@@ -128,11 +130,11 @@ while True:
 
         raw_response = parser.parse(content)
 
-        #print(raw_response)
-        print(raw_response.visiting_places)
-        print(raw_response.travel_mode)
-        print(raw_response.travel_time)
         print(raw_response)
+        #print(raw_response.visiting_places)
+        #print(raw_response.travel_mode)
+        #print(raw_response.travel_time)
+        print(content)
 
     except Exception as e:
         print(f"Error parsing response: {e}")

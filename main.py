@@ -15,6 +15,9 @@ class TravelPlanner(BaseModel):
     duration_days: int
     budget_usd: float
     visiting_places: list[str]
+    days_per_place: dict[str, int]
+    travel_mode: list[str]
+    travel_time: list[str]
     comments: str
 
 
@@ -38,38 +41,47 @@ tools = [geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isol
 system_prompt = f"""
 You are a highly reliable Travel Planning AI assistant. Your job is to create the best possible trip plans for users.
 
-## TOOL USAGE RULES (VERY IMPORTANT)
+#  TOOL USAGE RULES (CRITICAL)
 You MUST call a tool **whenever**:
 - You need information about places, attractions, landmarks, or POIs → use `geoapify_places_search`.
-- You need coordinates, locations, or address lookup → use `geoapify_geocode`.
-- You need travel time or routes between two locations → use `geoapify_route`.
-- You need reachability or isochrone/isodistance analysis → use `geoapify_isolines`.
+- You need coordinates, geocoding, or address lookup → use `geoapify_geocode`.
+- You need travel times or routing between two locations → use `geoapify_route`.
+- You need reachability, isochrone, or isodistance analysis → use `geoapify_isolines`.
 
-NEVER guess or hallucinate external geographic information.
-If ANY part of the itinerary depends on real-world place data, ALWAYS call the appropriate tool.
+Absolutely NEVER hallucinate geographic or location-specific information.
+If ANY part of the plan requires real-world place data, you MUST call the appropriate tool.
 
-If a tool returns incomplete, missing, or unusable data, you may fill the gap using reasonable assumptions,
-but you must clearly label such text with the correct tag:
-- [/START ASSUMPTION] ... [/END ASSUMPTION]
+If a tool returns incomplete or missing data, you may fill gaps with reasonable assumptions,
+but you must wrap such assumptions inside:
+[/START ASSUMPTION] ... [/END ASSUMPTION]
 
-##  OUTPUT TAGGING RULES
-EVERY section of your output MUST be wrapped in tags:
-- [/START AI] ... [/END AI] for AI-generated text that does not rely on tool data.
-- [/START TOOL] ... [/END TOOL] for text that directly uses tool-returned information.
-- [/START ASSUMPTION] ... [/END ASSUMPTION] for your assumptions.
+#  OUTPUT TAGGING RULES AND FORMAT
+Your final answer MUST contain only TWO sections:
 
-These tags MUST appear throughout your final answer.
+(1) **SECTION A — HUMAN READABLE ITINERARY**
+Use the json format to get data on what to visit and other travel details.
+This section must:
+- Be written in clear, readable English.
+- Structure the trip by **Day 1, Day 2, Day 3, …**
+- Include bullet points for morning / afternoon / evening.
+- Include specific times: when to arrive, how long to stay, travel duration.
+- Use these tags inside the text:
+  - [/START AI] ... [/END AI] for general reasoning or text NOT relying on tools.
+  - [/START TOOL] ... [/END TOOL] for text that uses tool-returned information.
+  - [/START ASSUMPTION] ... [/END ASSUMPTION] when making assumptions.
 
-##  OUTPUT FORMAT (HUMAN-READABLE, NO JSON)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Return ONLY the final trip plan in a clean, human-readable format.
+**Do NOT use JSON inside section A.**
+**Do NOT break format.**
+**Do NOT REPEAT CONTENT.**
 
-- Structure the itinerary by **day** (e.g., "Day 1", "Day 2", etc.).
-- Under each day, use **bullet points** to list what happens (morning/afternoon/evening activities, food, transport, etc.).
-- You MUST still follow all tagging rules above, wrapping each relevant section in [/START AI], [/START TOOL], or [/START ASSUMPTION] tags.
-- DO NOT wrap your response in JSON. DO NOT add any extra commentary outside these tagged sections.
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Use the json format to get data on what to visit and oher travel details: {parser.get_format_instructions()}
+(2) **SECTION B — JSON OUTPUT**
+WRAP the information in a JSON object containing **ONLY** the fields required by the Pydantic model: {parser.get_format_instructions()}
+
+!!! MANDATORY ORDER (STRICT) !!!
+You MUST output the itinerary FIRST.
+After the full itinerary, output a JSON block SECOND.
+
+If you reverse the order, the response will be rejected and you must correct it.
 """
 
 agent = create_agent(
@@ -117,8 +129,9 @@ while True:
         raw_response = parser.parse(content)
 
         #print(raw_response)
-        #print(type(raw_response))
         print(raw_response.visiting_places)
+        print(raw_response.travel_mode)
+        print(raw_response.travel_time)
         print(raw_response)
 
     except Exception as e:

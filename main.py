@@ -33,7 +33,7 @@ class ToolLoggingHandler(BaseCallbackHandler):
         print(f"[TOOL END] output={out}\n")
 
 
-llm1 = ChatOllama(model="llama3.1:8b", temperature=0)
+llm1 = ChatOllama(model="llama3.2:3b", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
 
 tools = [geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines]

@@ -130,11 +130,11 @@ while True:
 
         raw_response = parser.parse(content)
 
-        print(raw_response)
+        print("RAW RESPONSE:", raw_response)
         #print(raw_response.visiting_places)
         #print(raw_response.travel_mode)
         #print(raw_response.travel_time)
-        print(content)
+        print("CONTENT: ", content)
 
     except Exception as e:
         print(f"Error parsing response: {e}")

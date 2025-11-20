@@ -128,7 +128,7 @@ while True:
 
         raw_response = parser.parse(content)
 
-        print("RAW RESPONSE:", raw_response)
+        print("RAW RESPONSE:", raw_response) 
         # print(raw_response.visiting_places)
         # print(raw_response.travel_mode)
         # print(raw_response.travel_time)

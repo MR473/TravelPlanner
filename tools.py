@@ -44,7 +44,7 @@ class GeoapifyPlacesInput(BaseModel):
         ),
     )
     limit: int = Field(
-        10,
+        20,
         ge=1,
         le=50,
         description="Maximum number of places to return (1-50).",
@@ -259,7 +259,7 @@ def _places_radius(lat: float, lon: float, categories: str, limit: int) -> List[
 
 
 @tool("geoapify_places_search", args_schema=GeoapifyPlacesInput)
-def geoapify_places_search(city: str, interests: List[str], limit: int = 10) -> dict:
+def geoapify_places_search(city: str, interests: List[str], limit: int = 20) -> dict:
     """
     Search Geoapify Places for POIs in a given city matching user interests.
 

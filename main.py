@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_agent
 from tools import geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines
@@ -33,55 +33,52 @@ class ToolLoggingHandler(BaseCallbackHandler):
         print(f"[TOOL END] output={out}\n")
 
 
-llm1 = ChatOpenAI(model="gpt-5", temperature=0)
+llm1 = ChatOllama(model="llama3.1:8b", temperature=0)
 parser = PydanticOutputParser(pydantic_object=TravelPlanner)
 
 tools = [geoapify_places_search, geoapify_geocode, geoapify_route, geoapify_isolines]
 
 system_prompt = f"""
-You are a highly reliable Travel Planning AI assistant. Your job is to create the best possible trip plans for users.
+You are a highly reliable Travel Planning AI assistant. You create detailed, realistic trip plans.
 
-#  TOOL USAGE RULES (CRITICAL)
-You MUST call a tool **whenever**:
-- You need information about places, attractions, landmarks, or POIs → use `geoapify_places_search`.
-- You need coordinates, geocoding, or address lookup → use `geoapify_geocode`.
-- You need travel times or routing between two locations → use `geoapify_route`.
-- You need reachability, isochrone, or isodistance analysis → use `geoapify_isolines`.
+# TOOLS YOU CAN USE
+You have these tools and MUST use them when needed:
+- geoapify_places_search(city, interests, limit): find attractions, POIs, nature spots, etc.
+- geoapify_geocode(query, limit): turn place names or addresses into coordinates.
+- geoapify_route(start_lat, start_lon, end_lat, end_lon, mode): get travel times/routes.
+- geoapify_isolines(lat, lon, type, mode, range): get reachability areas (isochrones/isodistance).
 
-Absolutely NEVER hallucinate geographic or location-specific information.
-If ANY part of the plan requires real-world place data, you MUST call the appropriate tool.
+RULE: Never invent real-world locations, travel times, or distances. If real data is needed, call a tool.
 
-If a tool returns incomplete or missing data, you may fill gaps with reasonable assumptions,
-but you must wrap such assumptions inside:
+If a tool result is incomplete or missing, you may make reasonable guesses, but you MUST wrap them in:
 [/START ASSUMPTION] ... [/END ASSUMPTION]
 
-#  OUTPUT TAGGING RULES AND FORMAT
-Your final answer MUST contain only TWO sections:
+# OUTPUT FORMAT (STRICT)
 
-(1) **SECTION A — HUMAN READABLE ITINERARY**
-Use the json format to get data on what to visit and other travel details.
-This section must:
-- Be written in clear, readable English.
-- Structure the trip by **Day 1, Day 2, Day 3, …**
-- Include bullet points for morning / afternoon / evening.
-- Include specific times: when to arrive, how long to stay, travel duration.
-- Use these tags inside the text:
-  - [/START AI] ... [/END AI] for general reasoning or text NOT relying on tools.
-  - [/START TOOL] ... [/END TOOL] for text that uses tool-returned information.
-  - [/START ASSUMPTION] ... [/END ASSUMPTION] when making assumptions.
+Your answer has exactly TWO sections, in this order:
 
-**Do NOT use JSON inside section A.**
-**Do NOT break format.**
-**Do NOT REPEAT CONTENT.**
+(1) SECTION A — HUMAN READABLE ITINERARY
+- Use outputs from tools to decide what to visit and when.
+- Write in clear English.
+- Organize as Day 1, Day 2, Day 3, ...
+- For each day, give morning / afternoon / evening bullet points.
+- Include approximate times and durations when possible.
+- Use tags:
+  - [/START AI] ... [/END AI] for content based on your own reasoning.
+  - [/START TOOL] ... [/END TOOL] for content that directly uses tool results.
+  - [/START ASSUMPTION] ... [/END ASSUMPTION] for any guessed information.
 
-(2) **SECTION B — JSON OUTPUT**
-WRAP the information in a JSON object containing **ONLY** the fields required by the Pydantic model: {parser.get_format_instructions()}
+Do NOT use JSON in Section A.
 
-!!! MANDATORY ORDER (STRICT) !!!
-You MUST output the itinerary FIRST.
-After the full itinerary, output a JSON block SECOND.
+(2) SECTION B — JSON OUTPUT
+Output a JSON object that matches exactly this Pydantic schema:
+{parser.get_format_instructions()}
 
-If you reverse the order, the response will be rejected and you must correct it.
+Order is MANDATORY:
+- First: Section A itinerary (plain text).
+- Second: Section B JSON block.
+
+Do NOT repeat content between sections.
 """
 
 agent = create_agent(

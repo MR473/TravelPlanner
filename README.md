@@ -1,4 +1,4 @@
-# TravelPilot.AI 🚀🌍
+# TravelPilot.AI 
 ### *Your AI-powered travel planning assistant*
 
 TravelPilot.AI is an intelligent travel-planning platform that uses **LLMs, LangChain, and Geoapify** to automatically design optimized itineraries, perform real-time tool-based place lookups, and produce structured travel plans with full transparency and traceability.
@@ -40,11 +40,13 @@ All final responses conform to a strict **Pydantic schema**.
 ```
 TravelPilot.AI/
 │
-├── app.py
-├── travel_agent.py
-├── tools/
-├── models/
-├── logs/
+├── main.py (main branch: GPT-5, ollama branch: gpt-oss & llama3.2:3b)
+├── tools.py
+├── mapping.py
+├── .env (should be added)
+├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 └── README.md
 ```
 
@@ -59,16 +61,64 @@ TravelPilot.AI/
 
 ---
 
-## 🛠️ Installation
+## 🛠️ Installation & Setup
+### 🔧 1. Creating a Virtual Environment (non-`uv` users)
 
-### Using uv
+If you're **not using [`uv`](https://astral.sh/uv)**, you can still create a virtual environment using built-in Python tools.
+
+#### 🖥️ For macOS/Linux:
+```bash
+python3 -m venv .venv
+```
+
+#### 🪟 For Windows:
+```cmd
+python -m venv .venv
+```
+
+This will create a `.venv/` directory in your project folder.
+
+---
+
+### ▶️ 1.1. Activating the Environment
+
+Once created, activate the environment using the following command based on your OS and terminal:
+
+#### 🖥️ On macOS/Linux:
+```bash
+source .venv/bin/activate
+```
+
+#### 🪟 On Windows PowerShell:
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+#### 🪟 On Windows CMD:
+```cmd
+.venv\Scripts\activate
+```
+
+Once activated, you'll see `.venv` in your terminal prompt. You can then install dependencies using:
+
+```bash
+pip install -r requirements.txt
+```
+
+> Or, if you're using `uv`, simply run:
+```bash
+uv pip sync
+```
+
+
+### 2. Using uv
 ```
 uv sync
 uv venv
 source .venv/bin/activate
 ```
 
-### Using pip
+### 3. Using pip without venv
 ```
 pip install -r requirements.txt
 ```
@@ -89,13 +139,7 @@ GEOAPIFY_API_KEY=your_key
 ## ▶️ Run the App
 
 ```
-python app.py
-```
-
-or
-
-```
-streamlit run app.py
+python main.py
 ```
 
 ---
@@ -103,41 +147,11 @@ streamlit run app.py
 ## 📊 Tagging Example
 
 ```
-[TOOLS] Found 12 museums near Asheville.
-[AI] Here is your plan:
-[ASSUMPTION] Assuming restaurants are open after 9 PM.
+[/START TOOLS] Found 12 museums near Asheville. [/END TOOL]
+[/START AI] Here is your plan:[/END AI]
+[/START ASSUMPTION] Assuming restaurants are open after 9 PM.[/END ASSUMPTION]
 ```
-
----
-
-## 🧪 Research Mode
-Supports:
-- Multi-model comparison  
-- Prompt evaluation  
-- Temperature sweeps  
-- JSON/human output separation  
-
----
-
-## 🚀 Roadmap
-- [ ] Add caching  
-- [ ] Support more models  
-- [ ] Add visual maps  
-- [ ] Conversation memory  
-- [ ] Cloud deployment  
-
----
-
-## 🤝 Contributing
-Pull requests are welcome.
-
----
-
-## 📄 License
-MIT License (optional - edit as needed)
-
----
 
 ## 🙌 Acknowledgements
 - Geoapify API  
-- LangChain & OpenAI  
+- LangChain & OpenAI  & Ollama
